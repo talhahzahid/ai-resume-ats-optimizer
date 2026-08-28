@@ -1,0 +1,176 @@
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================
+   ResumeAI — design tokens
+   Concept: "optical scan" — a resume read the way a laser reads
+   a barcode. Signature element: a traveling scan-line (teal)
+   that sweeps during analysis and lingers on score accents.
+   ============================================================ */
+
+:root {
+  --paper: #f6f7fb;
+  --panel: #ffffff;
+  --ink: #14151e;
+  --ink-soft: #6b6e80;
+  --line: #e4e6ef;
+  --violet: #5b4fe9;
+  --violet-soft: #eeecfd;
+  --scan: #00c9a0;
+  --scan-soft: #e3fbf3;
+  --amber: #f0a93c;
+  --amber-soft: #fcf1dd;
+  --red: #ef5b5b;
+  --red-soft: #fceaea;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: "Inter", sans-serif;
+  color: var(--ink);
+  background: var(--paper);
+}
+
+.ra-root {
+  background-image: radial-gradient(circle at 85% -5%, rgba(91, 79, 233, 0.08), transparent 45%),
+    radial-gradient(circle at -5% 40%, rgba(0, 201, 160, 0.07), transparent 40%);
+}
+
+.ra-display {
+  font-family: "Space Grotesk", sans-serif;
+  letter-spacing: -0.01em;
+}
+.ra-mono {
+  font-family: "IBM Plex Mono", monospace;
+}
+
+.ra-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.ra-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 99px;
+}
+.ra-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@keyframes ra-sweep {
+  0% {
+    transform: translateY(-110%);
+    opacity: 0;
+  }
+  8% {
+    opacity: 1;
+  }
+  92% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(1100%);
+    opacity: 0;
+  }
+}
+.ra-sweep-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--scan) 20%, var(--scan) 80%, transparent);
+  box-shadow: 0 0 16px 2px rgba(0, 201, 160, 0.55);
+  animation: ra-sweep 2.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes ra-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.ra-fade-up {
+  animation: ra-fade-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes ra-pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+.ra-pulse {
+  animation: ra-pulse-dot 1.3s ease-in-out infinite;
+}
+
+@keyframes ra-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.ra-spin {
+  animation: ra-spin 1.1s linear infinite;
+}
+
+.ra-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  transition: box-shadow 0.25s ease, transform 0.25s ease, border-color 0.25s ease;
+}
+.ra-card-hover:hover {
+  box-shadow: 0 12px 28px -14px rgba(20, 21, 30, 0.18);
+  transform: translateY(-2px);
+  border-color: #d8d6fb;
+}
+
+.ra-btn-primary {
+  background: var(--ink);
+  color: #fff;
+  font-weight: 600;
+  transition: background 0.2s ease, transform 0.15s ease;
+}
+.ra-btn-primary:hover {
+  background: var(--violet);
+}
+.ra-btn-primary:active {
+  transform: scale(0.98);
+}
+
+.ra-track {
+  stroke: var(--line);
+}
+.ra-progress {
+  transition: stroke-dashoffset 1.1s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.ra-nav-link {
+  transition: background 0.18s ease, color 0.18s ease;
+}
+.ra-nav-link:hover {
+  background: var(--violet-soft);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ra-sweep-line,
+  .ra-fade-up,
+  .ra-pulse,
+  .ra-spin {
+    animation: none !important;
+  }
+}
