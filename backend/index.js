@@ -1,13 +1,18 @@
 import express from "express";
 import dotenv from "dotenv";
 import { sequelize } from "./src/config/database.js";
+import router from "./src/routes/resume.routes.js";
 dotenv.config();
 const app = express();
 const port = process.env.PORT || 9000;
 
+app.use(express.json());
+
 app.get("/", (req, res) => {
   res.send("Server is running");
 });
+
+app.use("/api/v1", router);
 
 const startServer = async () => {
   try {
