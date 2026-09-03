@@ -1,4 +1,4 @@
-const BASE = "http://localhost:8000/api/v1";
+const BASE = "https://ai-resume-ats-optimizer.onrender.com/api/v1";
 
 /**
  * Upload a resume PDF.
