@@ -27,7 +27,7 @@ const checkSections = (resume) => {
 
 // skill score
 const checkSkills = (resume) => {
-  const count = resume.skills.length || 0;
+  const count = resume?.skills?.length || 0;
   if (count >= 15) return 10;
   if (count >= 10) return 8;
   if (count >= 5) return 5;
@@ -38,8 +38,8 @@ const checkSkills = (resume) => {
 // experience score
 const checkExperience = (resume) => {
   let score = 0;
-  const experience = resume.experience || [];
-  if (!experience.length) return 0;
+  const experience = resume?.experience || [];
+  if (!experience?.length) return 0;
   experience.forEach((exp) => {
     if (exp.company) score += 1;
     if (exp.position) score += 1;
