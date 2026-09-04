@@ -196,7 +196,7 @@ const KEYWORD_BANKS = {
 };
 
 const detectDomain = (resumeText) => {
-  let bestDomain = "webDev";
+  let bestDomain = "general";
   let bestScore = 0;
 
   for (const [domain, keywords] of Object.entries(KEYWORD_BANKS)) {
@@ -207,13 +207,15 @@ const detectDomain = (resumeText) => {
     }
   }
 
+  // Need a real signal — don't force tech/webDev on non-tech resumes
+  if (bestScore < 2) return "general";
   return bestDomain;
 };
 
 // personal information
 const checkContactInfo = (resume) => {
   let score = 0;
-  const info = resume.personalInfo;
+  const info = resume?.personalInfo || {};
 
   if (info.name) score += 2;
   if (info.email) score += 2;
@@ -262,32 +264,40 @@ const checkExperience = (resume) => {
   return Math.min(score, 10); // max 10
 };
 
-// education score
+// education score — consider up to 2 entries
 const checkEducation = (resume) => {
+  const education = resume?.education || [];
+  if (!education.length) return 0;
+
   let score = 0;
-  const education = resume.education?.[0];
+  education.slice(0, 2).forEach((edu, idx) => {
+    const weight = idx === 0 ? 1 : 0.5;
+    if (edu.degree) score += 3 * weight;
+    if (edu.institution) score += 3 * weight;
+    if (edu.startDate || edu.endDate) score += 1 * weight;
+  });
 
-  if (!education) return 0;
-
-  if (education.degree) score += 3;
-  if (education.institution) score += 3;
-  if (education.startDate || education.endDate) score += 1;
-
-  return score; // max 7
+  return Math.min(Math.round(score), 7);
 };
 
 const checkKeywords = (resume, domain) => {
+  if (domain === "general") {
+    // Role-agnostic soft score: skills + experience presence
+    const skills = resume?.skills?.length || 0;
+    const exp = resume?.experience?.length || 0;
+    if (skills >= 8 && exp >= 1) return 7;
+    if (skills >= 4 || exp >= 1) return 5;
+    if (skills > 0) return 3;
+    return 0;
+  }
+
   const keywordBank = KEYWORD_BANKS[domain] || KEYWORD_BANKS.webDev;
-
   const resumeText = JSON.stringify(resume).toLowerCase();
-
   const matchCount = keywordBank.filter((keyword) =>
     resumeText.includes(keyword),
   ).length;
 
-  const score = Math.round((matchCount / keywordBank.length) * 10);
-
-  return score; // max 10
+  return Math.round((matchCount / keywordBank.length) * 10);
 };
 
 const checkAchievements = (resume) => {
@@ -295,7 +305,8 @@ const checkAchievements = (resume) => {
   const experience = resume.experience || [];
   const projects = resume.projects || [];
 
-  const metricRegex = /\d+(\.\d+)?\s*(%|percent|x|users|ms|seconds|hours)/i;
+  const metricRegex =
+    /(\$|€|£)?\d+(\.\d+)?\s*(k|m|%|percent|x|users|customers|ms|seconds|hours|days)?/i;
 
   const allResponsibilities = [
     ...experience.flatMap((exp) => exp.responsibilities || []),
@@ -308,19 +319,19 @@ const checkAchievements = (resume) => {
   if (resume.certifications?.length) score += 3;
   if (projects.length >= 2) score += 2;
 
-  return Math.min(score, 10); 
+  return Math.min(score, 10);
 };
 
 const checkFormatting = (resume) => {
   let score = 10;
 
-  if (!resume.personalInfo?.email) score -= 3;
-  if (!resume.personalInfo?.phone) score -= 2;
-  if (!resume.summary) score -= 2;
-  if (!resume.skills?.length) score -= 2;
-  if (!resume.experience?.length && !resume.projects?.length) score -= 1;
+  // Keep light — contact/summary already scored elsewhere; only structure gaps
+  if (!resume.skills?.length) score -= 3;
+  if (!resume.experience?.length && !resume.projects?.length) score -= 4;
+  if (!resume.education?.length) score -= 2;
+  if (resume.experience?.some((e) => !e.responsibilities?.length)) score -= 1;
 
-  return Math.max(score, 0); // max 10
+  return Math.max(score, 0);
 };
 
 const MAX_SCORES = {

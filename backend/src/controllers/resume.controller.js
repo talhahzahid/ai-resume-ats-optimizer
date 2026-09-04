@@ -1,22 +1,27 @@
-// import Resume from '../model/resume.model.js';
-// import ResumeAnalysis from '../model/resume_analysis.model.js';
-// import ResumeSuggestions from '../model/resume_suggestions.model.js';
 import {
+  getAllResumesService,
+  getResumeByIdService,
   getResumeStatusService,
   uploadResumeService,
+  deleteResumeService,
 } from '../service/resume.service.js';
-import {Resume, ResumeAnalysis, ResumeSuggestions} from '../model/index.js';
 import {AppError} from '../utils/AppError.js';
+
+export const getAllResumesController = async (req, res, next) => {
+  try {
+    const page = Number (req.query.page) || 1;
+    const limit = Number (req.query.limit) || 10;
+    const result = await getAllResumesService (req.sessionId, {page, limit});
+    res.status (200).json ({success: true, ...result});
+  } catch (err) {
+    next (err);
+  }
+};
+
 export const getResumeById = async (req, res, next) => {
   try {
-    const resume = await Resume.findByPk (req.params.id, {
-      include: [
-        {model: ResumeAnalysis, as: 'analysis'},
-        {model: ResumeSuggestions, as: 'suggestions'},
-      ],
-    });
-    if (!resume) throw new AppError ('Resume not found', 404);
-    res.status (200).json ({success: true, data: resume});
+    const data = await getResumeByIdService (req.params.id, req.sessionId);
+    res.status (200).json ({success: true, data});
   } catch (err) {
     next (err);
   }
@@ -24,8 +29,8 @@ export const getResumeById = async (req, res, next) => {
 
 export const createResumeController = async (req, res, next) => {
   try {
-    const result = await uploadResumeService (req.file);
-    res.json ({text: result});
+    const result = await uploadResumeService (req.file, req.sessionId);
+    res.status (200).json ({success: true, data: result, text: result});
   } catch (error) {
     next (error);
   }
@@ -39,7 +44,7 @@ export const getResumeStatus = async (req, res, next) => {
       throw new AppError ('Resume id is required', 400);
     }
 
-    const result = await getResumeStatusService (id);
+    const result = await getResumeStatusService (id, req.sessionId);
 
     res.status (200).json ({
       success: true,
@@ -47,5 +52,14 @@ export const getResumeStatus = async (req, res, next) => {
     });
   } catch (error) {
     next (error);
+  }
+};
+
+export const deleteResumeController = async (req, res, next) => {
+  try {
+    const result = await deleteResumeService (req.params.id, req.sessionId);
+    res.status (200).json ({success: true, data: result});
+  } catch (err) {
+    next (err);
   }
 };

@@ -7,12 +7,11 @@ import {
   TrendingUp,
   Clock,
   BarChart2,
+  Loader2,
 } from "lucide-react";
 import { MiniRing } from "../components/ui/Progress.jsx";
 import { ratingForScore, colorForScore } from "../data/mockData.js";
 import Badge from "../components/ui/Badge.jsx";
-
-/* ── helpers ────────────────────────────────────────────────────── */
 
 function greeting() {
   const h = new Date().getHours();
@@ -21,24 +20,19 @@ function greeting() {
   return "Good evening";
 }
 
-function avgScore(history) {
-  if (!history.length) return 0;
-  return Math.round(history.reduce((a, r) => a + r.score, 0) / history.length);
-}
-
 function scoreDelta(history) {
-  if (history.length < 2) return null;
-  return history[0].score - history[1].score;
+  const scored = history.filter((r) => typeof r.score === "number");
+  if (scored.length < 2) return null;
+  return scored[0].score - scored[1].score;
 }
 
 function toneForScore(score) {
+  if (score == null) return "amber";
   if (score >= 90) return "scan";
   if (score >= 75) return "violet";
   if (score >= 60) return "amber";
   return "red";
 }
-
-/* ── StatCard ───────────────────────────────────────────────────── */
 
 function StatCard({ icon: Icon, iconColor, iconBg, label, value, sub, badge, delay }) {
   return (
@@ -62,14 +56,15 @@ function StatCard({ icon: Icon, iconColor, iconBg, label, value, sub, badge, del
   );
 }
 
-/* ── ResumeRow ──────────────────────────────────────────────────── */
-
-function ResumeRow({ r, isLast }) {
+function ResumeRow({ r, isLast, onOpen }) {
+  const scoreLabel = typeof r.score === "number" ? r.score : "…";
   return (
-    <div
-      className={`flex items-center justify-between py-3.5 ${
+    <button
+      type="button"
+      onClick={() => onOpen?.(r.id)}
+      className={`w-full text-left flex items-center justify-between py-3.5 ${
         isLast ? "" : "border-b"
-      }`}
+      } hover:opacity-90 transition-opacity`}
       style={{ borderColor: "var(--line)" }}
     >
       <div className="flex items-center gap-3 min-w-0">
@@ -84,35 +79,40 @@ function ResumeRow({ r, isLast }) {
           <div className="text-xs text-[var(--ink-soft)] flex items-center gap-1 mt-0.5">
             <Clock size={11} />
             {r.date}
+            {r.status && r.status !== "completed" ? ` · ${r.status}` : ""}
           </div>
         </div>
       </div>
       <div className="flex items-center gap-3 shrink-0 ml-3">
-        <Badge tone={toneForScore(r.score)}>{r.score}</Badge>
-        <MiniRing score={r.score} size={38} stroke={4} />
+        {typeof r.score === "number" ? (
+          <>
+            <Badge tone={toneForScore(r.score)}>{r.score}</Badge>
+            <MiniRing score={r.score} size={38} stroke={4} />
+          </>
+        ) : (
+          <Badge tone="amber">{scoreLabel}</Badge>
+        )}
       </div>
-    </div>
+    </button>
   );
 }
 
-/* ── main page ──────────────────────────────────────────────────── */
-
-export default function Dashboard({ setPage, history }) {
-  const latest = history[0] ?? null;
-  const avg = avgScore(history);
+export default function Dashboard({ setPage, history, stats, loading, onOpenResume }) {
+  const latest = history.find((r) => typeof r.score === "number") ?? history[0] ?? null;
+  const total = stats?.total ?? history.length;
+  const avg = stats?.averageScore;
   const delta = scoreDelta(history);
-  const hasHistory = history.length > 0;
+  const hasHistory = total > 0;
+  const latestScore = typeof latest?.score === "number" ? latest.score : stats?.latestScore;
 
   return (
     <div className="max-w-6xl mx-auto px-5 lg:px-8 py-8 lg:py-10">
-
-      {/* Top row */}
       <div className="ra-fade-up mb-8 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div>
-          <h1 className="ra-display text-3xl font-bold mb-1">{greeting()} 👋</h1>
+          <h1 className="ra-display text-3xl font-bold mb-1">{greeting()}</h1>
           <p className="text-[var(--ink-soft)] text-sm">
             {hasHistory
-              ? `You've analyzed ${history.length} resume${history.length !== 1 ? "s" : ""}. Keep improving.`
+              ? `You've analyzed ${total} resume${total !== 1 ? "s" : ""}. Keep improving.`
               : "Upload your first resume to get started."}
           </p>
         </div>
@@ -125,16 +125,21 @@ export default function Dashboard({ setPage, history }) {
         </button>
       </div>
 
-      {/* Stat cards */}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
         <StatCard
           icon={BarChart2}
           label="Latest score"
-          value={latest ? `${latest.score}/100` : "—"}
-          sub={latest ? ratingForScore(latest.score) : "No analysis yet"}
+          value={typeof latestScore === "number" ? `${latestScore}/100` : "—"}
+          sub={
+            typeof latestScore === "number"
+              ? ratingForScore(latestScore)
+              : "No analysis yet"
+          }
           badge={
-            latest ? (
-              <Badge tone={toneForScore(latest.score)}>{ratingForScore(latest.score)}</Badge>
+            typeof latestScore === "number" ? (
+              <Badge tone={toneForScore(latestScore)}>
+                {ratingForScore(latestScore)}
+              </Badge>
             ) : null
           }
           delay={0}
@@ -142,8 +147,8 @@ export default function Dashboard({ setPage, history }) {
         <StatCard
           icon={FileText}
           label="Resumes analyzed"
-          value={history.length}
-          sub={history.length === 1 ? "1 version uploaded" : `${history.length} versions`}
+          value={loading ? "…" : total}
+          sub={total === 1 ? "1 version uploaded" : `${total} versions`}
           delay={60}
         />
         <StatCard
@@ -151,8 +156,12 @@ export default function Dashboard({ setPage, history }) {
           iconBg={avg >= 75 ? "var(--scan-soft)" : "var(--amber-soft)"}
           iconColor={avg >= 75 ? "var(--scan)" : "var(--amber)"}
           label="Average score"
-          value={hasHistory ? `${avg}/100` : "—"}
-          sub={hasHistory ? `Across all ${history.length} upload${history.length !== 1 ? "s" : ""}` : "No data yet"}
+          value={typeof avg === "number" ? `${avg}/100` : "—"}
+          sub={
+            typeof avg === "number"
+              ? `Across ${stats?.completed ?? 0} completed`
+              : "No data yet"
+          }
           delay={120}
         />
         <StatCard
@@ -172,11 +181,7 @@ export default function Dashboard({ setPage, history }) {
           sub={
             delta === null
               ? "Need 2+ analyses"
-              : delta > 0
-              ? "vs. previous upload"
-              : delta < 0
-              ? "vs. previous upload"
-              : "No change"
+              : "vs. previous upload"
           }
           badge={
             delta !== null && delta !== 0 ? (
@@ -192,17 +197,14 @@ export default function Dashboard({ setPage, history }) {
         />
       </div>
 
-      {/* Bottom two-col layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-
-        {/* Recent resumes */}
         <div
           className="lg:col-span-2 ra-card p-6 ra-fade-up"
           style={{ animationDelay: "240ms" }}
         >
           <div className="flex items-center justify-between mb-5">
             <h2 className="font-semibold text-base">Recent resumes</h2>
-            {history.length > 3 && (
+            {total > 0 && (
               <button
                 onClick={() => setPage("history")}
                 className="text-sm font-medium flex items-center gap-1"
@@ -213,14 +215,22 @@ export default function Dashboard({ setPage, history }) {
             )}
           </div>
 
-          {hasHistory ? (
+          {loading ? (
+            <div className="flex items-center justify-center py-12 text-[var(--ink-soft)] gap-2 text-sm">
+              <Loader2 size={16} className="ra-spin" /> Loading your resumes…
+            </div>
+          ) : hasHistory ? (
             <div>
               {history.slice(0, 4).map((r, i, arr) => (
-                <ResumeRow key={r.id} r={r} isLast={i === arr.length - 1} />
+                <ResumeRow
+                  key={r.id}
+                  r={r}
+                  isLast={i === arr.length - 1}
+                  onOpen={onOpenResume}
+                />
               ))}
             </div>
           ) : (
-            /* Empty state */
             <div className="flex flex-col items-center justify-center py-10 text-center">
               <div
                 className="w-12 h-12 rounded-2xl flex items-center justify-center mb-3"
@@ -242,7 +252,6 @@ export default function Dashboard({ setPage, history }) {
           )}
         </div>
 
-        {/* CTA / tips card */}
         <div
           className="ra-card ra-fade-up p-6 flex flex-col"
           style={{
@@ -254,29 +263,31 @@ export default function Dashboard({ setPage, history }) {
         >
           <Sparkles size={18} color="var(--scan)" className="mb-4" />
           <h3 className="ra-display font-semibold text-lg mb-2 leading-snug">
-            {latest
-              ? `Your score can go higher than ${latest.score}`
+            {typeof latestScore === "number"
+              ? `Your score can go higher than ${latestScore}`
               : "Get your first ATS score"}
           </h3>
           <p className="text-sm text-white/60 leading-relaxed flex-1">
-            {latest
+            {typeof latestScore === "number"
               ? "Our AI found targeted line-by-line improvements. Each suggestion includes your original text and a rewritten version."
               : "Upload a resume and we'll check ATS compatibility, keywords, formatting, and more — in seconds."}
           </p>
 
-          {/* Score bar (only when there's a latest score) */}
-          {latest && (
+          {typeof latestScore === "number" && (
             <div className="mt-5 mb-5">
               <div className="flex justify-between text-xs text-white/50 mb-1.5">
                 <span>Current</span>
-                <span>{latest.score} / 100</span>
+                <span>{latestScore} / 100</span>
               </div>
-              <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.12)" }}>
+              <div
+                className="h-1.5 rounded-full overflow-hidden"
+                style={{ background: "rgba(255,255,255,0.12)" }}
+              >
                 <div
                   className="h-full rounded-full"
                   style={{
-                    width: `${latest.score}%`,
-                    background: colorForScore(latest.score),
+                    width: `${latestScore}%`,
+                    background: colorForScore(latestScore),
                     transition: "width 1s cubic-bezier(0.16,1,0.3,1)",
                   }}
                 />
@@ -285,11 +296,13 @@ export default function Dashboard({ setPage, history }) {
           )}
 
           <button
-            onClick={() => setPage(latest ? "suggestions" : "upload")}
+            onClick={() =>
+              setPage(typeof latestScore === "number" ? "suggestions" : "upload")
+            }
             className="mt-auto flex items-center gap-2 text-sm font-semibold px-4 py-2.5 rounded-xl w-fit"
             style={{ background: "var(--scan)", color: "#053B30" }}
           >
-            {latest ? "See suggestions" : "Upload resume"}
+            {typeof latestScore === "number" ? "See suggestions" : "Upload resume"}
             <ArrowUpRight size={15} />
           </button>
         </div>

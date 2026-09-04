@@ -1,4 +1,4 @@
-﻿import { useState, useCallback } from "react";
+﻿import { useState, useCallback, useEffect } from "react";
 import Sidebar from "./components/layout/Sidebar.jsx";
 import MobileTopBar from "./components/layout/MobileTopBar.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
@@ -7,45 +7,137 @@ import Analyzing from "./pages/Analyzing.jsx";
 import Results from "./pages/Results.jsx";
 import Suggestions from "./pages/Suggestions.jsx";
 import Resumes from "./pages/Resumes.jsx";
-import { initialHistory } from "./data/mockData.js";
+import {
+  getResumes,
+  getResumeById,
+  deleteResume,
+  mapResumeItem,
+} from "./services/api.js";
 
 export default function App() {
   const [page, setPage] = useState("dashboard");
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [history, setHistory] = useState(initialHistory);
+  const [history, setHistory] = useState([]);
+  const [stats, setStats] = useState({
+    total: 0,
+    completed: 0,
+    averageScore: null,
+    latestScore: null,
+  });
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 10,
+    total: 0,
+    totalPages: 0,
+  });
+  const [historyLoading, setHistoryLoading] = useState(true);
+  const [historyError, setHistoryError] = useState("");
 
-  // Upload → Analyzing state
-  const [pendingFile, setPendingFile] = useState(null);   // { name, resumeId }
+  const [pendingFile, setPendingFile] = useState(null);
   const [currentAnalysis, setCurrentAnalysis] = useState(null);
   const [currentSuggestions, setCurrentSuggestions] = useState([]);
 
-  /** Called by UploadResume after successful upload — moves to analyzing screen */
+  const loadHistory = useCallback(async (pageNum = 1) => {
+    setHistoryLoading(true);
+    setHistoryError("");
+    try {
+      const data = await getResumes({ page: pageNum, limit: 10 });
+      setHistory((data.items || []).map(mapResumeItem));
+      setPagination(data.pagination);
+      setStats(data.stats);
+    } catch (err) {
+      setHistoryError(err.message || "Could not load your resumes.");
+      setHistory([]);
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadHistory(1);
+  }, [loadHistory]);
+
   const startPolling = ({ fileName, resumeId }) => {
     setPendingFile({ name: fileName, resumeId });
     setPage("analyzing");
   };
 
-  /** Called by Analyzing when polling returns "completed" */
-  const onAnalysisDone = useCallback((fileName, analysisPayload) => {
-    const suggestions = analysisPayload.suggestions ?? [];
-    setCurrentAnalysis(analysisPayload);
-    setCurrentSuggestions(suggestions);
-    setHistory((h) => [
-      { id: `r${Date.now()}`, name: fileName, date: "Just now", score: analysisPayload.atsScore },
-      ...h,
-    ]);
-    setPage("results");
-  }, []); // no deps — only uses stable setState functions
+  const onAnalysisDone = useCallback(
+    (fileName, analysisPayload) => {
+      const suggestions = analysisPayload.suggestions ?? [];
+      setCurrentAnalysis(analysisPayload);
+      setCurrentSuggestions(suggestions);
+      setPendingFile((prev) => prev ?? { name: fileName, resumeId: null });
+      loadHistory(1);
+      setPage("results");
+    },
+    [loadHistory]
+  );
 
-  /** Called by Analyzing on failure */
   const onAnalysisFailed = useCallback(() => {
     setPendingFile(null);
     setPage("upload");
-  }, []); // no deps — only uses stable setState functions
+  }, []);
+
+  const openResume = useCallback(async (resumeId) => {
+    try {
+      const data = await getResumeById(resumeId);
+      const atsScore =
+        typeof data.ats_score?.score === "number" ? data.ats_score.score : 0;
+      const breakdown = data.ats_score?.breakdown ?? {};
+      const suggestions = Array.isArray(data.suggestions) ? data.suggestions : [];
+
+      setPendingFile({ name: data.fileName, resumeId: data.resumeId });
+      setCurrentAnalysis({ atsScore, breakdown, suggestions });
+      setCurrentSuggestions(suggestions);
+      setPage("results");
+    } catch (err) {
+      setHistoryError(err.message || "Could not open resume.");
+    }
+  }, []);
+
+  const openSuggestions = useCallback(async (resumeId) => {
+    try {
+      const data = await getResumeById(resumeId);
+      const suggestions = Array.isArray(data.suggestions) ? data.suggestions : [];
+      setPendingFile({ name: data.fileName, resumeId: data.resumeId });
+      setCurrentSuggestions(suggestions);
+      if (data.ats_score) {
+        setCurrentAnalysis({
+          atsScore: data.ats_score.score,
+          breakdown: data.ats_score.breakdown ?? {},
+          suggestions,
+        });
+      }
+      setPage("suggestions");
+    } catch (err) {
+      setHistoryError(err.message || "Could not load suggestions.");
+    }
+  }, []);
+
+  const removeResume = useCallback(
+    async (resumeId) => {
+      await deleteResume(resumeId);
+      const nextPage =
+        history.length === 1 && pagination.page > 1
+          ? pagination.page - 1
+          : pagination.page;
+      await loadHistory(nextPage);
+    },
+    [history.length, pagination.page, loadHistory]
+  );
 
   let body;
   if (page === "dashboard")
-    body = <Dashboard setPage={setPage} history={history} />;
+    body = (
+      <Dashboard
+        setPage={setPage}
+        history={history}
+        stats={stats}
+        loading={historyLoading}
+        onOpenResume={openResume}
+      />
+    );
   else if (page === "upload")
     body = <UploadResume onUploadDone={startPolling} />;
   else if (page === "analyzing")
@@ -68,7 +160,19 @@ export default function App() {
   else if (page === "suggestions")
     body = <Suggestions apiSuggestions={currentSuggestions} />;
   else if (page === "history")
-    body = <Resumes history={history} setHistory={setHistory} setPage={setPage} />;
+    body = (
+      <Resumes
+        history={history}
+        pagination={pagination}
+        loading={historyLoading}
+        error={historyError}
+        setPage={setPage}
+        onPageChange={loadHistory}
+        onOpenResume={openResume}
+        onOpenSuggestions={openSuggestions}
+        onDelete={removeResume}
+      />
+    );
 
   return (
     <div className="ra-root min-h-screen flex w-full">
