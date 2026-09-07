@@ -24,14 +24,15 @@ const Resume = sequelize.define (
     textHash: {
       type: DataTypes.STRING (64),
       allowNull: false,
+      unique: false,
     },
     status: {
       type: DataTypes.ENUM ('processing', 'completed', 'failed'),
       defaultValue: 'processing',
       allowNull: false,
     },
-    sessionId: {
-      type: DataTypes.STRING,
+    userId: {
+      type: DataTypes.INTEGER,
       allowNull: true,
     },
   },
@@ -41,12 +42,12 @@ const Resume = sequelize.define (
     indexes: [
       {
         unique: true,
-        fields: ['textHash', 'sessionId'],
-        name: 'resumes_text_hash_session_id_unique',
+        fields: ['textHash', 'userId'],
+        name: 'resumes_text_hash_user_id_unique',
       },
       {
-        fields: ['sessionId'],
-        name: 'resumes_session_id_idx',
+        fields: ['userId'],
+        name: 'resumes_user_id_idx',
       },
     ],
   }
