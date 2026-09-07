@@ -15,6 +15,7 @@ const allowedOrigins = [
   'http://localhost:5174',
   'http://localhost:5175',
   'https://ai-resume-ats-optimizer-nine.vercel.app',
+  'https://ai-resume-ats-optimizer-nine.vercel.app/',
 ];
 
 app.set ('trust proxy', 1);
