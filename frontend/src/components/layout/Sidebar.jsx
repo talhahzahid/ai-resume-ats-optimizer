@@ -1,16 +1,24 @@
-import { X, Radar } from "lucide-react";
+import { X, LogOut } from "lucide-react";
 import { NAV_ITEMS } from "../../data/mockData.js";
+import { initialsFromName } from "../../services/api.js";
 
-export default function Sidebar({ page, setPage, mobileOpen, setMobileOpen }) {
+export default function Sidebar({ page, setPage, mobileOpen, setMobileOpen, user, onLogout }) {
+  const initials    = initialsFromName(user?.name ?? "");
+  const displayName = user?.name ?? user?.email ?? "Account";
+
   const content = (
     <div className="flex flex-col h-full">
+
       {/* Logo */}
       <div className="flex items-center gap-2.5 px-5 py-5 border-b" style={{ borderColor: "var(--line)" }}>
         <div
           className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
           style={{ background: "linear-gradient(135deg, var(--violet), var(--scan))" }}
         >
-          <Radar size={15} color="#fff" strokeWidth={2.5} />
+          {/* simple radar-style svg — no extra lucide import needed */}
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 10 10"/><path d="M6 12h12M12 6v12"/>
+          </svg>
         </div>
         <span className="text-base font-bold tracking-tight">ResumeAI</span>
       </div>
@@ -18,7 +26,7 @@ export default function Sidebar({ page, setPage, mobileOpen, setMobileOpen }) {
       {/* Nav */}
       <nav className="flex-1 px-3 pt-3 space-y-0.5">
         {NAV_ITEMS.map((item) => {
-          const Icon = item.icon;
+          const Icon   = item.icon;
           const active = page === item.key;
           return (
             <button
@@ -37,16 +45,38 @@ export default function Sidebar({ page, setPage, mobileOpen, setMobileOpen }) {
         })}
       </nav>
 
-      {/* User row — no Pro upsell, no plan label */}
-      <div className="px-5 py-5 border-t flex items-center gap-3" style={{ borderColor: "var(--line)" }}>
+      {/* User row + logout */}
+      <div
+        className="px-4 py-4 border-t flex items-center gap-3"
+        style={{ borderColor: "var(--line)" }}
+      >
+        {/* Avatar */}
         <div
           className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
-          style={{ background: "var(--ink)" }}
+          style={{ background: "var(--violet)" }}
         >
-          TZ
+          {initials}
         </div>
-        <span className="text-sm font-medium truncate">Talha Zahid</span>
+
+        {/* Name — truncates if long */}
+        <span className="text-sm font-medium truncate flex-1 min-w-0">
+          {displayName}
+        </span>
+
+        {/* Logout button */}
+        <button
+          onClick={onLogout}
+          title="Log out"
+          aria-label="Log out"
+          className="shrink-0 p-1.5 rounded-lg transition-colors duration-150"
+          style={{ color: "var(--ink-soft)" }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = "var(--red-soft)"; e.currentTarget.style.color = "var(--red)"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "var(--ink-soft)"; }}
+        >
+          <LogOut size={15} strokeWidth={2} />
+        </button>
       </div>
+
     </div>
   );
 

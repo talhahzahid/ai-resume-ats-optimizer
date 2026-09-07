@@ -6,12 +6,54 @@ const BASE =
 //   import.meta.env.VITE_API_URL ||
 //   "http://localhost:8000/api/v1";
 
+const TOKEN_KEY = "ats_token";
+const USER_KEY = "ats_user";
+
+export function getToken() {
+  try {
+    return localStorage.getItem(TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function getStoredUser() {
+  try {
+    const raw = localStorage.getItem(USER_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function setAuth(token, user) {
+  localStorage.setItem(TOKEN_KEY, token);
+  localStorage.setItem(USER_KEY, JSON.stringify(user));
+  localStorage.removeItem("ats_session_id");
+}
+
+export function clearAuth() {
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(USER_KEY);
+  localStorage.removeItem("ats_session_id");
+}
+
 async function apiFetch(path, options = {}) {
+  const token = getToken();
+  const { headers: optionHeaders, ...rest } = options;
   const res = await fetch(`${BASE}${path}`, {
-    credentials: "include",
-    ...options,
+    ...rest,
+    headers: {
+      ...(optionHeaders || {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
   });
   const payload = await res.json().catch(() => null);
+
+  if (res.status === 401 && !path.startsWith("/auth/")) {
+    clearAuth();
+    window.dispatchEvent(new Event("auth:logout"));
+  }
 
   if (!res.ok) {
     throw new Error(
@@ -22,10 +64,35 @@ async function apiFetch(path, options = {}) {
   return payload;
 }
 
-/**
- * Upload a resume PDF.
- * POST /api/v1/upload
- */
+export async function registerUser({ name, email, password }) {
+  const payload = await apiFetch("/auth/register", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name, email, password }),
+  });
+  const data = payload?.data;
+  if (!data?.token || !data?.user) throw new Error("Register failed");
+  setAuth(data.token, data.user);
+  return data.user;
+}
+
+export async function loginUser({ email, password }) {
+  const payload = await apiFetch("/auth/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+  const data = payload?.data;
+  if (!data?.token || !data?.user) throw new Error("Login failed");
+  setAuth(data.token, data.user);
+  return data.user;
+}
+
+export async function getMe() {
+  const payload = await apiFetch("/auth/me");
+  return payload?.data?.user ?? null;
+}
+
 export async function uploadResume(file) {
   const formData = new FormData();
   formData.append("pdf", file);
@@ -44,19 +111,11 @@ export async function uploadResume(file) {
   };
 }
 
-/**
- * Poll resume status.
- * GET /api/v1/resume/{resumeId}/status
- */
 export async function getResumeStatus(resumeId) {
   const payload = await apiFetch(`/resume/${resumeId}/status`);
   return payload?.data ?? payload;
 }
 
-/**
- * List resumes for this browser session (paginated).
- * GET /api/v1/resumes?page=1&limit=10
- */
 export async function getResumes({ page = 1, limit = 10 } = {}) {
   const payload = await apiFetch(`/resumes?page=${page}&limit=${limit}`);
   return {
@@ -76,19 +135,11 @@ export async function getResumes({ page = 1, limit = 10 } = {}) {
   };
 }
 
-/**
- * Full resume detail (analysis + suggestions).
- * GET /api/v1/resume/{id}
- */
 export async function getResumeById(resumeId) {
   const payload = await apiFetch(`/resume/${resumeId}`);
   return payload?.data ?? payload;
 }
 
-/**
- * Delete a resume owned by this session.
- * DELETE /api/v1/resume/{id}
- */
 export async function deleteResume(resumeId) {
   const payload = await apiFetch(`/resume/${resumeId}`, { method: "DELETE" });
   return payload?.data ?? payload;
@@ -107,7 +158,6 @@ export function formatResumeDate(iso) {
   }
 }
 
-/** Map API list item → UI history row */
 export function mapResumeItem(r) {
   return {
     id: r.resumeId,
@@ -117,4 +167,16 @@ export function mapResumeItem(r) {
     status: r.status,
     createdAt: r.createdAt,
   };
+}
+
+export function initialsFromName(name) {
+  const parts = String(name || "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (!parts.length) return "?";
+  return parts
+    .slice(0, 2)
+    .map((p) => p[0].toUpperCase())
+    .join("");
 }
