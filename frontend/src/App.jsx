@@ -43,6 +43,7 @@ export default function App() {
 
   /* ── auth ──────────────────────────────────────────────────────── */
   const logout = useCallback(() => {
+    
     clearAuth();
     setUser(null);
     setHistory([]);
